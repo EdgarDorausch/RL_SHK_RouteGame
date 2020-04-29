@@ -27,7 +27,7 @@ model = nn.Sequential(
 
 print(model)
 
-def train(batch_size=100, batch_number=300):
+def train(batch_size, batch_number):
     print('=====================')
 
     optimizer = optim.Adam(model.parameters(), lr=0.003)
@@ -77,7 +77,7 @@ def test():
 
 
 test()
-rewards = train(batch_size=20, batch_number=300)
+rewards = train(batch_size=200, batch_number=300)
 test()
 
 plt.figure(figsize=(12,8))
