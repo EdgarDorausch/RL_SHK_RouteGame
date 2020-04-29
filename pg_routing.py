@@ -1,5 +1,12 @@
 from typing import Any, Dict, List, Tuple
 import random
+import numpy as np
+import torch
+import torchvision as tv
+import matplotlib.pyplot as plt
+from time import time
+from torchvision import datasets, transforms
+from torch import nn, optim
 
 class Edge:
     def __init__(self, index: int):
@@ -44,6 +51,9 @@ class Graph:
             vtx_b.add_edge(new_edge)
         
         self.action_size = 1 + max(vtx.degree() for vtx in self.vertex_list)
+
+    def get_mapping_shape(self):
+        return 2*self.agent_number, self.action_size**self.agent_number
             
     def get_or_create_vertex(self, identifier):
 
@@ -70,13 +80,13 @@ class Graph:
         for edge in self.edge_list:
             edge.flush_counter()
 
-    def reward(self, state, action: int):
+    def reward(self, state, action: int) -> float:
         actions = []
         for _ in range(self.agent_number):
             actions.append(action % self.action_size)
             action = action // self.action_size
 
-        print(actions)
+        # print(actions)
 
         for a_idx in range(self.agent_number):
             pos = self.vertex_list[state[2*a_idx  ]]
@@ -110,10 +120,49 @@ g = Graph(2, [
     ('a', 'b'),
     ('a', 'b')
 ])
+batch_size = 20
+batch_number = 300
 
-for i in range(9):
-    s = g.get_random_state()
-    print(s)
+inp_size, out_size = g.get_mapping_shape()
+hidden_size = 10
 
-    r = g.reward(s, i)
-    print(r)
+model = nn.Sequential(
+    nn.Linear(inp_size, hidden_size),
+    nn.ReLU(),
+    nn.Linear(hidden_size, out_size),
+    nn.Softmax(dim=1)
+)
+
+print(model)
+
+optimizer = optim.Adam(model.parameters(), lr=0.003)
+time0 = time()
+for b in range(batch_number):
+    optimizer.zero_grad()
+
+    states = [g.get_random_state() for _ in range(batch_size)]
+    state_tensor = torch.FloatTensor(states)
+
+    action_probs = model(state_tensor)
+    action_probs_np = action_probs.detach().numpy()
+    actions = [np.random.choice(out_size, p=action_probs_np[c]) for c in range(batch_size)]
+    action_tensor = torch.LongTensor(actions)
+
+    rewards = [g.reward(s,a) for s,a in zip(states, actions)]
+    reward_tensor = torch.FloatTensor(rewards)
+
+    print(b, np.mean(rewards))
+
+
+    logprob = torch.log(action_probs)
+    selected_logprobs = reward_tensor * logprob[np.arange(len(action_tensor)), action_tensor]
+    loss = -selected_logprobs.mean()
+
+    # print(logprob)
+    # print(selected_logprobs)
+
+    # Calculate gradients
+    loss.backward()
+    # Apply gradients
+    optimizer.step()
+
