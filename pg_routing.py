@@ -76,20 +76,33 @@ class Graph:
             actions.append(action % self.action_size)
             action = action // self.action_size
 
+        print(actions)
+
         for a_idx in range(self.agent_number):
-            vtx = self.vertex_list[state[2*a_idx]]
+            pos = self.vertex_list[state[2*a_idx  ]]
+            dst = self.vertex_list[state[2*a_idx+1]]
 
             current_action = actions[a_idx]
             if current_action == self.action_size-1:
-                continue
-            elif current_action < vtx.degree:
-                vtx.edges[current_action].increment_counter()
-            else:
+                if pos == dst:
+                    continue
+                else: # If agant is falsly waiting
+                    self.flush_counters()
+                    return 0
+            elif current_action < pos.degree():
+                edge = pos.edges[current_action]
+                edge.increment_counter()
+                invalid_edge = edge not in dst.edges
+                if invalid_edge: # If agent has chosen a edge pointing to a wrong vertex
+                    self.flush_counters()
+                    return 0
+            else: # If edge index out of range (invalid action)
                 self.flush_counters()
                 return 0
         
-        reward = 1/max(edge.counter for edge in self.edge_list)
-        self.flush_counters
+        max_c = max(edge.counter for edge in self.edge_list)
+        reward = 1 if max_c == 0 else 1/max_c
+        self.flush_counters()
         return reward
 
 
@@ -97,3 +110,10 @@ g = Graph(2, [
     ('a', 'b'),
     ('a', 'b')
 ])
+
+for i in range(9):
+    s = g.get_random_state()
+    print(s)
+
+    r = g.reward(s, i)
+    print(r)
